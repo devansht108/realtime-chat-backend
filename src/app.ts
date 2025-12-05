@@ -4,6 +4,8 @@ import cors from "cors";
 import helmet from "helmet";
 import dotenv from "dotenv";
 import "express-async-errors";
+import authRoutes from "./routes/authRoutes";
+
 
 import errorHandler from "./middleware/errorHandler";
 
@@ -22,6 +24,10 @@ app.use(helmet());
 
 // request logs print karta hai
 app.use(morgan("dev"));
+
+// auth routes use kar rahe hain
+app.use("/api/auth", authRoutes);
+
 
 // test route to check server
 app.get("/", (_req: Request, res: Response) => {
