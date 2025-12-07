@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Socket Test</title>
+  </head>
+  <body>
+    <h2>Socket Test Page</h2>
+
+    <div>
+      <label>Access Token:</label>
+      <input id="tokenInput" type="text" style="width: 600px" />
+      <button onclick="connectSocket()">Connect</button>
+    </div>
+
+    <p id="status">Not connected</p>
+
+
+    <script src="http://localhost:8000/socket.io/socket.io.js"></script>
+
+    <script>
+      let socket;
+
+      function connectSocket() {
+        const token = document.getElementById("tokenInput").value.trim();
+
+        if (!token) {
+          alert("Token daal pehle");
+          return;
+        }
+
+        socket = io("http://localhost:8000", {
+          auth: {
+            token: token,
+          },
+        });
+
+        window.socket = socket;
+
+        socket.on("connect", () => {
+          document.getElementById("status").innerText =
+            "Connected with id: " + socket.id;
+          console.log("socket connected", socket.id);
+        });
+
+        socket.on("connect_error", (err) => {
+          console.error("connect_error", err.message);
+        });
+
+        socket.on("receive_message", (msg) => {
+          console.log("receive_message", msg);
+        });
+
+        socket.on("message_delivered", (data) => {
+          console.log("message_delivered", data);
+        });
+      }
+    </script>
+  </body>
+</html>
