@@ -81,7 +81,12 @@ export const setupSocket = (io: Server) => {
           });
 
           // database me message ko delivered mark kar rahe hain
-          await markDelivered(message._id.toString());
+         await markDelivered(
+  message._id.toString(),
+  message.conversationId.toString(),
+  receiverId
+);
+
         }
       }
     );
