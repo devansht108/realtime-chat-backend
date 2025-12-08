@@ -1,7 +1,3 @@
-import "./types/express"; 
-// yeh import Express ke Request object ko globally extend karta hai
-// isse hum req.userId jaisi custom properties bina TypeScript error ke use kar sakte hain
-
 import express, { Request, Response } from "express";
 import morgan from "morgan";
 import cors from "cors";
