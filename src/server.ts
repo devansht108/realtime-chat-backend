@@ -1,3 +1,4 @@
+import "./config/redis";
 import http from "http";
 import app from "./app";
 import connectDB from "./config/db";
