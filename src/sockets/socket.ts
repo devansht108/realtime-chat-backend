@@ -6,11 +6,12 @@ import {
   markRead
 } from "../services/messageService";
 import { redis } from "../config/redis";
+import User from "../models/User";
 
-// Map userId -> multiple active socketIds
+// userId -> multiple active socket ids
 const userSocketMap: Map<string, Set<string>> = new Map();
 
-// Verify JWT and extract userId
+// token verify and userId extraction
 const verifyToken = (token: string): string => {
   const secret = process.env.ACCESS_TOKEN_SECRET;
   if (!secret) {
@@ -22,7 +23,7 @@ const verifyToken = (token: string): string => {
 };
 
 export const setupSocket = (io: Server) => {
-  // Socket auth middleware
+  // socket auth middleware
   io.use((socket, next) => {
     try {
       const token = socket.handshake.auth?.token;
@@ -40,7 +41,7 @@ export const setupSocket = (io: Server) => {
   io.on("connection", async (socket: Socket) => {
     const userId = socket.data.userId as string;
 
-    // Track active sockets
+    // track active sockets
     if (!userSocketMap.has(userId)) {
       userSocketMap.set(userId, new Set());
     }
@@ -48,11 +49,12 @@ export const setupSocket = (io: Server) => {
 
     console.log("User connected", userId, socket.id);
 
-    // Mark user online in Redis
+    // mark user online in redis
     await redis.set(`user:${userId}:online`, "1");
+
     socket.broadcast.emit("user_online", { userId });
 
-    // Send message
+    // send message
     socket.on(
       "send_message",
       async ({ receiverId, content }: { receiverId: string; content: string }) => {
@@ -77,7 +79,7 @@ export const setupSocket = (io: Server) => {
       }
     );
 
-    // Message read event
+    // message read event
     socket.on(
       "message_read",
       async ({ messageId }: { messageId: string }) => {
@@ -98,7 +100,7 @@ export const setupSocket = (io: Server) => {
       }
     );
 
-    // Typing indicator
+    // typing indicator
     socket.on("typing", ({ receiverId }) => {
       const receiverSockets = userSocketMap.get(receiverId);
       if (!receiverSockets) return;
@@ -117,18 +119,29 @@ export const setupSocket = (io: Server) => {
       }
     });
 
-    // Disconnect
+    // disconnect
     socket.on("disconnect", async () => {
       const set = userSocketMap.get(userId);
+
       if (set) {
+        // remove current socket
         set.delete(socket.id);
+
+        // if no more active sockets
         if (set.size === 0) {
           userSocketMap.delete(userId);
+
+          // mark offline in redis
+          await redis.del(`user:${userId}:online`);
+
+          // update last seen in mongo
+          await User.findByIdAndUpdate(userId, {
+            lastSeen: new Date()
+          });
+
+          socket.broadcast.emit("user_offline", { userId });
         }
       }
-
-      await redis.del(`user:${userId}:online`);
-      socket.broadcast.emit("user_offline", { userId });
 
       console.log("User disconnected", userId, socket.id);
     });

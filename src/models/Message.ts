@@ -72,6 +72,13 @@ const MessageSchema = new Schema<IMessageDocument>(
   }
 );
 
+// conversation + createdAt index fast history ke liye
+MessageSchema.index({ conversationId: 1, createdAt: -1 });
+
+// receiver + status index unread queries ke liye
+MessageSchema.index({ receiver: 1, status: 1 });
+
+
 // mongoose model
 const Message: Model<IMessageDocument> = mongoose.model<IMessageDocument>(
   "Message",

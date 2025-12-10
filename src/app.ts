@@ -6,6 +6,8 @@ import dotenv from "dotenv";
 import "express-async-errors";
 // yeh package async controllers me thrown errors ko automatically
 // Express ke error handler tak forward kar deta hai
+import userRoutes from "./routes/userRoutes";
+
 
 import conversationRoutes from "./routes/conversationRoutes";
 import authRoutes from "./routes/authRoutes";
@@ -37,6 +39,9 @@ app.use("/api/auth", authRoutes);
 
 // conversations aur messages related routes ko yahan mount kar rahe hain
 app.use("/api/conversations", conversationRoutes);
+
+app.use("/api/users", userRoutes);
+
 
 // ek simple test route to check ki server properly kaam kar raha hai ya nahi
 app.get("/", (_req: Request, res: Response) => {

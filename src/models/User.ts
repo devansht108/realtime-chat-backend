@@ -7,6 +7,8 @@ export interface IUser {
   password: string;
   createdAt?: Date; // timestamps ke wajah se auto-generate hoga
   updatedAt?: Date; // timestamps ke wajah se auto-generate hoga
+  lastSeen?: Date | null; // user ka last seen time
+
 }
 
 // yeh interface IUser ko mongoose Document ke sath extend karta hai
@@ -17,7 +19,12 @@ const UserSchema = new Schema<IUserDocument>(
   {
     username: { type: String, required: true }, // username required hai
     email: { type: String, required: true, unique: true }, // email unique + required
-    password: { type: String, required: true } // password required hai
+    password: { type: String, required: true } ,// password required hai
+    lastSeen: {
+    type: Date,
+    default: null
+  }
+
   },
   { timestamps: true } // createdAt aur updatedAt auto-generate honge
 );
