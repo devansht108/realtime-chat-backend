@@ -6,9 +6,16 @@ export interface IMessage {
   receiver: mongoose.Types.ObjectId; // jis user ko message mila
   conversationId: mongoose.Types.ObjectId; // message kis conversation ka part hai
   content: string; // actual message text
-  delivered: boolean; // message deliver hua ya nahi
-  createdAt?: Date; // timestamps automatically set honge
-  updatedAt?: Date; // timestamps automatically set honge
+
+  // message ka current status
+  // sent -> delivered -> read
+  status: "sent" | "delivered" | "read";
+
+  deliveredAt?: Date; // kab message deliver hua
+  readAt?: Date; // kab message read hua
+
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 // mongoose document ke sath extend kiya gaya interface
@@ -17,25 +24,58 @@ export interface IMessageDocument extends IMessage, Document {}
 const MessageSchema = new Schema<IMessageDocument>(
   {
     // sender ka user id
-    sender: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    sender: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true
+    },
 
     // receiver ka user id
-    receiver: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    receiver: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true
+    },
 
-    // yeh batata hai message kis conversation se belong karta hai
-    conversationId: { type: Schema.Types.ObjectId, ref: "Conversation", required: true },
+    // message kis conversation ka hissa hai
+    conversationId: {
+      type: Schema.Types.ObjectId,
+      ref: "Conversation",
+      required: true
+    },
 
-    // message content
-    content: { type: String, required: true },
+    // actual text message
+    content: {
+      type: String,
+      required: true
+    },
 
-    // delivered status, default false rakha hai
-    delivered: { type: Boolean, default: false }
+    // message lifecycle status
+    status: {
+      type: String,
+      enum: ["sent", "delivered", "read"],
+      default: "sent"
+    },
+
+    // delivery ka time
+    deliveredAt: {
+      type: Date
+    },
+
+    // read ka time
+    readAt: {
+      type: Date
+    }
   },
-  { timestamps: true } // auto-createdAt aur updatedAt fields
+  {
+    timestamps: true // createdAt aur updatedAt auto manage honge
+  }
 );
 
-// mongoose model banaya ja raha hai jisse hum messages collection par CRUD kar sakte hain
-const Message: Model<IMessageDocument> =
-  mongoose.model<IMessageDocument>("Message", MessageSchema);
+// mongoose model
+const Message: Model<IMessageDocument> = mongoose.model<IMessageDocument>(
+  "Message",
+  MessageSchema
+);
 
 export default Message;

@@ -16,51 +16,82 @@ export const saveMessage = async (
   if (!conversation) {
     conversation = await Conversation.create({
       participants: [senderId, receiverId],
-      unreadCount: {} // initially unread count blank rakha hai
+      unreadCount: {}
     });
   }
 
   // naya message create karke database me save kar rahe hain
   const message = await Message.create({
-    sender: senderId, // message bhejne wala user
-    receiver: receiverId, // message receive karne wala user
-    conversationId: conversation._id, // conversation ka reference
-    content, // actual message text
-    delivered: false // by default message delivered nahi mana jaata
+    sender: senderId,
+    receiver: receiverId,
+    conversationId: conversation._id,
+    content,
+
+    // Day 7: message lifecycle ka starting state
+    status: "sent"
   });
 
   // conversation ke last message details update kar rahe hain
   conversation.lastMessage = content;
   conversation.lastMessageAt = new Date();
 
-  // receiver ke liye unread messages ka count badha rahe hain
+  // receiver ke unread messages ka count badha rahe hain
   const currentUnread =
     conversation.unreadCount.get(receiverId) || 0;
 
   conversation.unreadCount.set(receiverId, currentUnread + 1);
 
-  // updated conversation ko save kar rahe hain
   await conversation.save();
 
   return message;
 };
 
-// jab message delivery confirm ho jaye
+// jab receiver online ho aur message deliver ho jaye
 export const markDelivered = async (
   messageId: string,
   conversationId: string,
   receiverId: string
 ) => {
-  // message ko delivered mark kar rahe hain
+  // message ko delivered state me update kar rahe hain
   await Message.findByIdAndUpdate(messageId, {
-    delivered: true
+    status: "delivered",
+    deliveredAt: new Date()
   });
 
-  // conversation ko id ke basis par fetch kar rahe hain
+  // conversation fetch kar rahe hain
   const conversation = await Conversation.findById(conversationId);
   if (!conversation) return;
 
-  // receiver ke unread messages count ko reset kar rahe hain
+  // receiver ka unread count reset kar rahe hain
   conversation.unreadCount.set(receiverId, 0);
+
   await conversation.save();
+};
+
+// jab user message read kar leta hai
+export const markRead = async (
+  messageId: string,
+  readerId: string
+) => {
+  // messageId ke basis par message ko database se fetch kar rahe hain
+  const message = await Message.findById(messageId);
+
+  // agar message exist nahi karta toh null return kar dete hain
+  if (!message) return null;
+
+  // message ka status read mark kar rahe hain
+  message.status = "read";
+
+  // message read hone ka timestamp save kar rahe hain
+  message.readAt = new Date();
+
+  // updated message ko database me save kar rahe hain
+  await message.save();
+
+  // minimal data return kar rahe hain socket notification ke liye
+  return {
+    messageId: message._id.toString(), // read hua message ka id
+    readerId, // jis user ne message read kiya
+    senderId: message.sender.toString() // message bhejne wale ka userId
+  };
 };
