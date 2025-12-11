@@ -1,20 +1,38 @@
 import Redis from "ioredis";
 
-// Redis client ka ek instance create kar rahe hain
-// aur Redis server ke sath connection establish karega
+// main client (lazyConnect = true means yeh tab tak connect nahi karega jab tak .connect() nahi bulayenge)
 export const redis = new Redis({
-  host: "127.0.0.1", // Redis server ka address (localhost) my comp
-  port: 6379        // Redis ka default port location in my comp
+  host: process.env.REDIS_HOST || "127.0.0.1",
+  port: Number(process.env.REDIS_PORT) || 6379,
+  lazyConnect: true
 });
 
-// jab Redis server se successful connection ho jata hai
-redis.on("connect", () => {
-  // console me confirmation message print kar rahe hain
-  console.log("Redis connected");
+// publisher client
+export const redisPublisher = new Redis({
+  host: process.env.REDIS_HOST || "127.0.0.1",
+  port: Number(process.env.REDIS_PORT) || 6379,
+  lazyConnect: true
 });
 
-// agar Redis ke sath connection ya runtime error aaye
-redis.on("error", (err) => {
-  // error details log kar rahe hain debugging ke liye
-  console.error("Redis error", err);
+// subscriber client
+export const redisSubscriber = new Redis({
+  host: process.env.REDIS_HOST || "127.0.0.1",
+  port: Number(process.env.REDIS_PORT) || 6379,
+  lazyConnect: true
 });
+
+// manual connect
+export async function connectRedis() {
+  try {
+    await redis.connect();
+    console.log("Redis main client connected");
+
+    await redisPublisher.connect();
+    console.log("Redis publisher connected");
+
+    await redisSubscriber.connect();
+    console.log("Redis subscriber connected");
+  } catch (err) {
+    console.error("Redis connection error:", err);
+  }
+}
