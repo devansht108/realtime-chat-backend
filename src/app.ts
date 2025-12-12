@@ -7,6 +7,7 @@ import "express-async-errors";
 // yeh package async controllers me thrown errors ko automatically
 // Express ke error handler tak forward kar deta hai
 import userRoutes from "./routes/userRoutes";
+import userStatusRoutes from "./routes/userStatusRoutes";
 
 
 import conversationRoutes from "./routes/conversationRoutes";
@@ -41,6 +42,8 @@ app.use("/api/auth", authRoutes);
 app.use("/api/conversations", conversationRoutes);
 
 app.use("/api/users", userRoutes);
+
+app.use("/api/users", userStatusRoutes);
 
 
 // ek simple test route to check ki server properly kaam kar raha hai ya nahi

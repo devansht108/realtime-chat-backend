@@ -6,9 +6,8 @@ import {
   markRead
 } from "../services/messageService";
 import { redis } from "../config/redis";
-import User from "../models/User";
 
-// userId -> multiple active socket ids
+// userId -multiple active socket ids
 const userSocketMap: Map<string, Set<string>> = new Map();
 
 // token verify and userId extraction
@@ -17,7 +16,6 @@ const verifyToken = (token: string): string => {
   if (!secret) {
     throw new Error("ACCESS_TOKEN_SECRET missing");
   }
-
   const decoded = jwt.verify(token, secret) as { userId: string };
   return decoded.userId;
 };
@@ -41,7 +39,7 @@ export const setupSocket = (io: Server) => {
   io.on("connection", async (socket: Socket) => {
     const userId = socket.data.userId as string;
 
-    // track active sockets
+    // user ke active sockets track kar rahe hain
     if (!userSocketMap.has(userId)) {
       userSocketMap.set(userId, new Set());
     }
@@ -49,12 +47,13 @@ export const setupSocket = (io: Server) => {
 
     console.log("User connected", userId, socket.id);
 
-    // mark user online in redis
+    // redis me user ko online mark karna
     await redis.set(`user:${userId}:online`, "1");
 
+    // sab clients ko notify karna ki user online aaya
     socket.broadcast.emit("user_online", { userId });
 
-    // send message
+    // message send
     socket.on(
       "send_message",
       async ({ receiverId, content }: { receiverId: string; content: string }) => {
@@ -119,26 +118,25 @@ export const setupSocket = (io: Server) => {
       }
     });
 
-    // disconnect
+    // disconnect handling
     socket.on("disconnect", async () => {
       const set = userSocketMap.get(userId);
 
       if (set) {
-        // remove current socket
+        // current socket remove kar rahe hain
         set.delete(socket.id);
 
-        // if no more active sockets
+        // agar user ka koi active socket nahi bacha
         if (set.size === 0) {
           userSocketMap.delete(userId);
 
-          // mark offline in redis
+          // redis me user ko offline mark karo
           await redis.del(`user:${userId}:online`);
 
-          // update last seen in mongo
-          await User.findByIdAndUpdate(userId, {
-            lastSeen: new Date()
-          });
+          // redis me lastSeen update karo
+          await redis.set(`user:${userId}:lastSeen`, Date.now().toString());
 
+          // sab clients ko notify karo ki user offline ho gaya
           socket.broadcast.emit("user_offline", { userId });
         }
       }
