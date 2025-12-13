@@ -7,15 +7,16 @@ import {
 } from "../services/messageService";
 import { redis } from "../config/redis";
 
-// userId -multiple active socket ids
+// userId -> multiple active socket ids
 const userSocketMap: Map<string, Set<string>> = new Map();
 
-// token verify and userId extraction
+// token verify karke userId nikalna
 const verifyToken = (token: string): string => {
   const secret = process.env.ACCESS_TOKEN_SECRET;
   if (!secret) {
     throw new Error("ACCESS_TOKEN_SECRET missing");
   }
+
   const decoded = jwt.verify(token, secret) as { userId: string };
   return decoded.userId;
 };
@@ -39,7 +40,7 @@ export const setupSocket = (io: Server) => {
   io.on("connection", async (socket: Socket) => {
     const userId = socket.data.userId as string;
 
-    // user ke active sockets track kar rahe hain
+    // user ke active sockets track karna
     if (!userSocketMap.has(userId)) {
       userSocketMap.set(userId, new Set());
     }
@@ -47,38 +48,66 @@ export const setupSocket = (io: Server) => {
 
     console.log("User connected", userId, socket.id);
 
-    // redis me user ko online mark karna
+    // redis me online mark
     await redis.set(`user:${userId}:online`, "1");
 
-    // sab clients ko notify karna ki user online aaya
     socket.broadcast.emit("user_online", { userId });
 
     // message send
     socket.on(
       "send_message",
       async ({ receiverId, content }: { receiverId: string; content: string }) => {
-        const message = await saveMessage(userId, receiverId, content);
+
+        //message + conversation dono milte hain
+        const { message, conversation } = await saveMessage(
+          userId,
+          receiverId,
+          content
+        );
 
         const receiverSockets = userSocketMap.get(receiverId);
+        const senderSockets = userSocketMap.get(userId);
+
+        // receiver ko message bhejna
         if (receiverSockets) {
           for (const socketId of receiverSockets) {
             io.to(socketId).emit("receive_message", message);
+
+            // conversation list update for receiver
+            io.to(socketId).emit("conversation_updated", {
+              conversationId: conversation._id,
+              lastMessage: message,
+              unreadCount: conversation.unreadCount.get(receiverId) || 0
+            });
           }
-
-          socket.emit("message_delivered", {
-            messageId: message._id
-          });
-
-          await markDelivered(
-            message._id.toString(),
-            message.conversationId.toString(),
-            receiverId
-          );
         }
+
+        // sender ko conversation update bhejna
+        if (senderSockets) {
+          for (const socketId of senderSockets) {
+            io.to(socketId).emit("conversation_updated", {
+              conversationId: conversation._id,
+              lastMessage: message,
+              unreadCount: 0
+            });
+          }
+        }
+
+        // sender ko delivery confirmation
+        socket.emit("message_delivered", {
+          messageId: message._id
+        });
+
+        // delivered mark karna
+        await markDelivered(
+          message._id.toString(),
+          conversation._id.toString(),
+          receiverId
+        );
       }
     );
 
-    // message read event
+    // message read
     socket.on(
       "message_read",
       async ({ messageId }: { messageId: string }) => {
@@ -99,7 +128,7 @@ export const setupSocket = (io: Server) => {
       }
     );
 
-    // typing indicator
+    // typing start
     socket.on("typing", ({ receiverId }) => {
       const receiverSockets = userSocketMap.get(receiverId);
       if (!receiverSockets) return;
@@ -109,6 +138,7 @@ export const setupSocket = (io: Server) => {
       }
     });
 
+    // typing stop
     socket.on("stop_typing", ({ receiverId }) => {
       const receiverSockets = userSocketMap.get(receiverId);
       if (!receiverSockets) return;
@@ -118,25 +148,19 @@ export const setupSocket = (io: Server) => {
       }
     });
 
-    // disconnect handling
+    // disconnect
     socket.on("disconnect", async () => {
       const set = userSocketMap.get(userId);
 
       if (set) {
-        // current socket remove kar rahe hain
         set.delete(socket.id);
 
-        // agar user ka koi active socket nahi bacha
         if (set.size === 0) {
           userSocketMap.delete(userId);
 
-          // redis me user ko offline mark karo
           await redis.del(`user:${userId}:online`);
-
-          // redis me lastSeen update karo
           await redis.set(`user:${userId}:lastSeen`, Date.now().toString());
 
-          // sab clients ko notify karo ki user offline ho gaya
           socket.broadcast.emit("user_offline", { userId });
         }
       }
