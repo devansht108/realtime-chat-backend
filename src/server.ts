@@ -4,7 +4,8 @@ import connectDB from "./config/db";
 import { Server } from "socket.io";
 import { setupSocket } from "./sockets/socket";
 
-// redis imports
+// Redis adapter related imports
+// yeh socket.io ko Redis ke through scale karne ke liye use hota hai
 import { createAdapter } from "@socket.io/redis-adapter";
 import {
   redisPublisher,
@@ -12,35 +13,38 @@ import {
   connectRedis
 } from "./config/redis";
 
-// port
+// server ka port env se le rahe hain, warna default 8000
 const PORT = process.env.PORT ? Number(process.env.PORT) : 8000;
 
-// http server
+// express app ke upar HTTP server create kar rahe hain
 const server = http.createServer(app);
 
-// socket.io
+// socket.io server initialize kar rahe hain
 const io = new Server(server, {
-  cors: { origin: "*" }
+  cors: { origin: "*" } // filhaal sab origins allow kar rahe hain
 });
 
 async function startServer() {
-  // connect redis clients
+  // node-redis client ko connect kar rahe hain
+  // yeh sirf rate limiting ke liye use hota hai
   await connectRedis();
 
-  // attach redis adapter
+  // socket.io ke liye Redis adapter attach kar rahe hain
+  // yeh ioredis publisher aur subscriber use karta hai
   io.adapter(createAdapter(redisPublisher, redisSubscriber));
   console.log("Redis adapter is enabled");
 
-  // socket setup
+  // socket events aur authentication setup kar rahe hain
   setupSocket(io);
 
-  // connect DB
+  // MongoDB database se connection establish kar rahe hain
   await connectDB();
 
-  // start server
+  // HTTP server ko start kar rahe hain
   server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
   });
 }
 
+// server startup function call kar rahe hain
 startServer();

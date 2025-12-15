@@ -1,56 +1,110 @@
 import { Request, Response } from "express";
 import Conversation from "../models/Conversation";
 import Message from "../models/Message";
+import { getManyUsersStatus } from "../services/presenceService";
 
-// local typed request jisme auth object available hai
+// typed request jisme auth object available hai
 interface AuthRequest extends Request {
   auth: {
     userId: string;
   };
 }
 
-// user ke saare conversations fetch karne ka controller
+// logged-in user ke conversations fetch karna
 export const getUserConversations = async (
   req: AuthRequest,
   res: Response
 ) => {
-  // auth middleware se aaya hua logged-in userId le rahe hain
   const userId = req.auth.userId;
 
-  // us user ke saare conversations nikal rahe hain
+  // user ke saare conversations fetch kar rahe hain
   const conversations = await Conversation.find({
-    participants: userId // jisme user participant ho
+    participants: userId
   })
-    // latest message wali conversation upar aayegi
     .sort({ lastMessageAt: -1 })
-    // participants ke basic details populate kar rahe hain
     .populate("participants", "username email");
 
-  // conversations ko response me bhej rahe hain
-  res.json(conversations);
+  // sab participant ids collect kar rahe hain (except self)
+  const otherUserIds: string[] = [];
+
+  conversations.forEach(conv => {
+    conv.participants.forEach((p: any) => {
+      if (p._id.toString() !== userId) {
+        otherUserIds.push(p._id.toString());
+      }
+    });
+  });
+
+  // Redis se online + lastSeen status fetch kar rahe hain
+  const statuses = await getManyUsersStatus(otherUserIds);
+
+  // map banaya for quick lookup
+  const statusMap = new Map(
+    statuses.map(s => [s.userId, s])
+  );
+
+  // final response format
+  const formatted = conversations.map(conv => {
+    const otherUser = conv.participants.find(
+      (p: any) => p._id.toString() !== userId
+    ) as any;
+
+    const status = statusMap.get(otherUser._id.toString());
+
+    return {
+      conversationId: conv._id,
+      participants: [otherUser],
+      lastMessage: conv.lastMessage,
+      online: status?.online ?? false,
+      lastSeen: status?.lastSeen ?? null
+    };
+  });
+
+  res.json({
+    success: true,
+    conversations: formatted
+  });
 };
 
-// kisi ek conversation ke messages pagination ke sath
+// cursor-based messages pagination
 export const getMessages = async (
   req: AuthRequest,
   res: Response
 ) => {
-  // URL params se conversationId le rahe hain
   const { conversationId } = req.params;
+  const before = req.query.before as string | undefined;
 
-  // query params se page aur limit read kar rahe hain
-  const page = Number(req.query.page) || 1;
-  const limit = Number(req.query.limit) || 20;
+  const limit = 20;
 
-  // conversation ke messages database se fetch kar rahe hain
-  const messages = await Message.find({ conversationId })
-    // newest messages pehle aayenge
-    .sort({ createdAt: -1 })
-    // pagination ke liye skip
-    .skip((page - 1) * limit)
-    // ek page me kitne messages chahiye
-    .limit(limit);
+  // base query
+  const query: any = { conversationId };
 
-  // messages ko oldest to newest order me bhejne ke liye reverse kar rahe hain
-  res.json(messages.reverse());
+  // agar cursor diya hai to usse pehle ke messages
+  if (before) {
+    query._id = { $lt: before };
+  }
+
+  // messages fetch kar rahe hain (latest first)
+  const messages = await Message.find(query)
+    .sort({ _id: -1 })
+    .limit(limit + 1);
+
+  // check kar rahe hain next page exist karta hai ya nahi
+  const hasMore = messages.length > limit;
+
+  if (hasMore) {
+    messages.pop();
+  }
+
+  // next cursor last message ka _id hoga
+  const nextCursor =
+    messages.length > 0
+      ? messages[messages.length - 1]._id
+      : null;
+
+  res.json({
+    success: true,
+    messages: messages.reverse(), // oldest → newest
+    nextCursor
+  });
 };
