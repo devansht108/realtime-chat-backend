@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import Conversation from "../models/Conversation";
 import Message from "../models/Message";
 import { getManyUsersStatus } from "../services/presenceService";
+import {redis} from "../config/redis";
 
 // typed request jisme auth object available hai
 interface AuthRequest extends Request {
@@ -76,6 +77,17 @@ export const getMessages = async (
 
   const limit = 20;
 
+  // sabse pehle check karo ki kya messages redis cache mein hain agar hain to database call skip karke wahi se return kar do
+  // hum sirf first page ko cache kar rahe hain jab before parameter nahi hota
+  const cacheKey = `conversation:${conversationId}:messages`;
+  
+  if (!before) {
+    const cachedData = await redis.get(cacheKey);
+    if (cachedData) {
+      return res.json(JSON.parse(cachedData));
+    }
+  }
+
   // base query
   const query: any = { conversationId };
 
@@ -102,9 +114,16 @@ export const getMessages = async (
       ? messages[messages.length - 1]._id
       : null;
 
-  res.json({
+  const finalResponse = {
     success: true,
     messages: messages.reverse(), // oldest → newest
     nextCursor
-  });
+  };
+
+  // agar ye first page hai to database se aaye hue response ko redis mein save kar do taaki agli baar jaldi mil jaaye hum 60 seconds ka expiry time laga rahe hain
+  if (!before) {
+    await redis.set(cacheKey, JSON.stringify(finalResponse), "EX", 60);
+  }
+
+  res.json(finalResponse);
 };
