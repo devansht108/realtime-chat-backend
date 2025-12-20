@@ -10,8 +10,7 @@ import "./workers/emailWorker";
 import { createAdapter } from "@socket.io/redis-adapter";
 import {
   redisPublisher,
-  redisSubscriber,
-  connectRedis
+  redisSubscriber
 } from "./config/redis";
 
 // server ka port env se le rahe hain, warna default 8000
@@ -26,9 +25,8 @@ const io = new Server(server, {
 });
 
 async function startServer() {
-  // node-redis client ko connect kar rahe hain
-  // yeh sirf rate limiting ke liye use hota hai
-  await connectRedis();
+  // ioredis auto-connect karta hai
+  // isliye yahan manually Redis connect karne ki zarurat nahi hai
 
   // socket.io ke liye Redis adapter attach kar rahe hain
   // yeh ioredis publisher aur subscriber use karta hai

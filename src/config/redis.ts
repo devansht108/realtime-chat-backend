@@ -4,24 +4,40 @@ import { Redis } from "ioredis";
 const redisHost = process.env.REDIS_HOST || "localhost";
 const redisPort = parseInt(process.env.REDIS_PORT || "6379");
 
-const redisConfig = {
-  host: redisHost,
-  port: redisPort,
-  maxRetriesPerRequest: null // required for queues
-};
+// cloud redis (Upstash) ke liye REDIS_URL use hoga
+const redisUrl = process.env.REDIS_URL;
 
-// 1. general purpose redis client
-export const redis = new Redis(redisConfig);
 
-// 2. publisher client for socket.io
-export const redisPublisher = new Redis(redisConfig);
+export const redis = redisUrl
+  ? new Redis(redisUrl) // agar URL mila toh direct TLS redis use karo
+  : new Redis({
+      host: redisHost,
+      port: redisPort,
+      maxRetriesPerRequest: null // required for queues
+    });
 
-// 3. subscriber client for socket.io
-export const redisSubscriber = new Redis(redisConfig);
+// publisher client for socket.io
+export const redisPublisher = redisUrl
+  ? new Redis(redisUrl)
+  : new Redis({
+      host: redisHost,
+      port: redisPort,
+      maxRetriesPerRequest: null
+    });
+
+// subscriber client 
+export const redisSubscriber = redisUrl
+  ? new Redis(redisUrl)
+  : new Redis({
+      host: redisHost,
+      port: redisPort,
+      maxRetriesPerRequest: null
+    });
 
 // connection function called by server.ts
+// (ab ioredis auto-connect karta hai, yeh sirf logging ke liye reh gaya hai)
 export const connectRedis = async () => {
-  console.log(`Redis Service: Connecting to ${redisHost}:${redisPort}...`);
+  console.log("Redis Service: Using ioredis auto-connection");
 };
 
 // log connection status for all clients
