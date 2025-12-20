@@ -3,6 +3,7 @@ import app from "./app";
 import connectDB from "./config/db";
 import { Server } from "socket.io";
 import { setupSocket } from "./sockets/socket";
+import "./workers/emailWorker";
 
 // Redis adapter related imports
 // yeh socket.io ko Redis ke through scale karne ke liye use hota hai

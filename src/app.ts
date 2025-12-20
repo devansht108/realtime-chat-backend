@@ -14,6 +14,7 @@ import conversationRoutes from "./routes/conversationRoutes";
 
 import errorHandler from "./middleware/errorHandler";
 import { customRedisRateLimiter } from "./middleware/customRateLimiter";
+import emailRoutes from "./routes/emailRoutes";
 
 // .env file ke environment variables load kar rahe hain
 dotenv.config();
@@ -42,14 +43,13 @@ app.use(morgan("dev"));
   - brute force aur abuse se protection ke liye
 */
 app.use("/api/auth", customRedisRateLimiter, authRoutes);
-
 // conversations aur messages related routes
 app.use("/api/conversations", conversationRoutes);
-
 // user related routes
 // jaise profile, last seen, user status, etc.
 app.use("/api/users", userRoutes);
 app.use("/api/users", userStatusRoutes);
+app.use("/api/email", emailRoutes);
 
 // simple health check route
 // server properly chal raha hai ya nahi check karne ke liye

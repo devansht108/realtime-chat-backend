@@ -1,31 +1,39 @@
-import Redis from "ioredis";
+import { Redis } from "ioredis";
 
-/*
-  ioredis clients
-  inka use real-time features ke liye hota hai:
-  - socket.io redis adapter
-  - pub/sub events
-  - user presence (online/offline)
-  - rate limiting
-*/
+// get host from docker env or default to localhost
+const redisHost = process.env.REDIS_HOST || "localhost";
+const redisPort = parseInt(process.env.REDIS_PORT || "6379");
 
-// main redis client
-// yeh client auto-connect hota hai
-export const redis = new Redis({
-  host: process.env.REDIS_HOST || "127.0.0.1",
-  port: Number(process.env.REDIS_PORT) || 6379
+const redisConfig = {
+  host: redisHost,
+  port: redisPort,
+  maxRetriesPerRequest: null // required for queues
+};
+
+// 1. general purpose redis client
+export const redis = new Redis(redisConfig);
+
+// 2. publisher client for socket.io
+export const redisPublisher = new Redis(redisConfig);
+
+// 3. subscriber client for socket.io
+export const redisSubscriber = new Redis(redisConfig);
+
+// connection function called by server.ts
+export const connectRedis = async () => {
+  console.log(`Redis Service: Connecting to ${redisHost}:${redisPort}...`);
+};
+
+// log connection status for all clients
+const clients = [redis, redisPublisher, redisSubscriber];
+const names = ["Main Redis", "Publisher", "Subscriber"];
+
+clients.forEach((client, index) => {
+  client.on("connect", () => {
+    console.log(`${names[index]} connected successfully`);
+  });
+
+  client.on("error", (err) => {
+    console.error(`${names[index]} error:`, err);
+  });
 });
-
-// publisher client (socket.io adapter ke liye)
-export const redisPublisher = redis.duplicate();
-
-// subscriber client (socket.io adapter ke liye)
-export const redisSubscriber = redis.duplicate();
-
-/*
-  ioredis auto-connect karta hai
-  yahan manually connect karne ki zarurat nahi
-*/
-export async function connectRedis() {
-  return;
-}

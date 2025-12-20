@@ -1,0 +1,56 @@
+version: "3.8"
+
+services:
+  # redis service for caching, rate limiting, presence, pub/sub
+  redis:
+    image: redis:alpine
+    container_name: chat-redis
+    ports:
+      - "6379:6379" # host machine se redis access ke liye
+
+  # mongodb service for storing users, conversations, messages
+  mongo:
+    image: mongo:latest
+    container_name: chat-mongo
+    ports:
+      - "27017:27017" # local machine se mongo access ke liye
+    volumes:
+      - mongo-data:/data/db # mongo data persist karne ke liye
+
+  # nodejs backend application
+  app:
+    build: . # Dockerfile use karke backend image build hoti hai
+    container_name: chat-backend
+    ports:
+      - "8000:8000" # backend API ko host par expose kar rahe hain
+    environment:
+      - PORT=8000 # backend server ka port
+      - MONGO_URI=mongodb://mongo:27017/chat-db # mongo container ka internal address
+      - REDIS_HOST=redis # redis container ka hostname
+      - REDIS_PORT=6379
+
+      # authentication aur security related secrets
+      - JWT_SECRET=${JWT_SECRET}
+      - ACCESS_TOKEN_SECRET=${ACCESS_TOKEN_SECRET}
+      - ACCESS_TOKEN_EXPIRE=${ACCESS_TOKEN_EXPIRE}
+      - REFRESH_TOKEN_SECRET=${REFRESH_TOKEN_SECRET}
+      - REFRESH_TOKEN_EXPIRE=${REFRESH_TOKEN_EXPIRE}
+
+      # frontend URL for CORS and redirects
+      - CLIENT_URL=${CLIENT_URL}
+
+      # environment mode
+      - NODE_ENV=production
+
+    # mongo aur redis pehle start ho jayein isliye dependency set ki hai
+    depends_on:
+      - mongo
+      - redis
+
+    # .env file se environment variables load ho rahe hain
+    env_file:
+      - .env
+
+# mongodb ke data ko persist karne ke liye named volume
+volumes:
+  mongo-data:

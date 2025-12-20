@@ -1,4 +1,4 @@
-import * as jwt from "jsonwebtoken";
+import jwt from "jsonwebtoken";
 
 // yeh function env variable safely fetch karta hai
 // agar value undefined ho to error throw karega
@@ -16,9 +16,9 @@ export const generateAccessToken = (userId: string): string => {
   const secret = getEnv("ACCESS_TOKEN_SECRET");
 
   return jwt.sign(
-    { userId }, // payload me userId store kar rahe hain
-    secret,     // token sign karne ka secret
-    { expiresIn: getEnv("ACCESS_TOKEN_EXPIRE") } // expire time env se aa raha hai
+    { userId },
+    secret,
+    { expiresIn: getEnv("ACCESS_TOKEN_EXPIRE") as any } // type casting taaki build fail na ho
   );
 };
 
@@ -30,7 +30,7 @@ export const generateRefreshToken = (userId: string): string => {
   return jwt.sign(
     { userId },
     secret,
-    { expiresIn: getEnv("REFRESH_TOKEN_EXPIRE") }
+    { expiresIn: getEnv("REFRESH_TOKEN_EXPIRE") as any }
   );
 };
 
