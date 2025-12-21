@@ -1,5 +1,5 @@
 import { Worker } from "bullmq";
-import { redis } from "../config/redis";
+import { bullmqRedis } from "../config/redis";
 
 // fake email sending function jo 2 second wait karega
 const mockSendEmail = async (email: string, content: string) => {
@@ -16,7 +16,9 @@ export const emailWorker = new Worker(
   "email-queue", // ye naam same hona chahiye jo queue file me use kiya tha
   async (job) => {
     // jab bhi queue me koi job aayegi ye function chalega
-    console.log(`Processing job ${job.id}: Sending email to user ${job.data.receiverId}`);
+    console.log(
+      `Processing job ${job.id}: Sending email to user ${job.data.receiverId}`
+    );
 
     // yahan hum email sending simulate kar rahe hain
     await mockSendEmail("user@example.com", job.data.messageContent);
@@ -24,8 +26,9 @@ export const emailWorker = new Worker(
     console.log(`Email sent successfully for job ${job.id}`);
   },
   {
-    // shared redis connection use kar rahe hain taaki docker me error na aaye
-    connection: redis,
+    // BullMQ ke liye hamesha dedicated redis client use karna chahiye
+    // shared redis client yahan allowed nahi hota
+    connection: bullmqRedis,
     concurrency: 5 // ek saath 5 email bhejne ki limit
   }
 );

@@ -7,7 +7,6 @@ const redisPort = parseInt(process.env.REDIS_PORT || "6379");
 // cloud redis (Upstash) ke liye REDIS_URL use hoga
 const redisUrl = process.env.REDIS_URL;
 
-
 export const redis = redisUrl
   ? new Redis(redisUrl) // agar URL mila toh direct TLS redis use karo
   : new Redis({
@@ -25,13 +24,29 @@ export const redisPublisher = redisUrl
       maxRetriesPerRequest: null
     });
 
-// subscriber client 
+// subscriber client
 export const redisSubscriber = redisUrl
   ? new Redis(redisUrl)
   : new Redis({
       host: redisHost,
       port: redisPort,
       maxRetriesPerRequest: null
+    });
+
+/*
+  BullMQ ke liye alag Redis client banana zaroori hota hai
+  kyunki BullMQ shared Redis connections accept nahi karta
+  aur strict rule follow karta hai:
+  maxRetriesPerRequest MUST be null
+*/
+export const bullmqRedis = redisUrl
+  ? new Redis(redisUrl, {
+      maxRetriesPerRequest: null // BullMQ ke liye mandatory
+    })
+  : new Redis({
+      host: redisHost,
+      port: redisPort,
+      maxRetriesPerRequest: null // BullMQ ke liye mandatory
     });
 
 // connection function called by server.ts
@@ -41,8 +56,8 @@ export const connectRedis = async () => {
 };
 
 // log connection status for all clients
-const clients = [redis, redisPublisher, redisSubscriber];
-const names = ["Main Redis", "Publisher", "Subscriber"];
+const clients = [redis, redisPublisher, redisSubscriber, bullmqRedis];
+const names = ["Main Redis", "Publisher", "Subscriber", "BullMQ Redis"];
 
 clients.forEach((client, index) => {
   client.on("connect", () => {

@@ -1,10 +1,12 @@
 import { Queue } from "bullmq";
-import { redis } from "../config/redis";
+import { bullmqRedis } from "../config/redis";
 
 // humari queue ka naam email-queue hai
 // isme hum wo jobs daalenge jo background me process karni hain
 export const emailQueue = new Queue("email-queue", {
-  connection: redis, // shared redis connection use kar rahe hain
+  // BullMQ ke liye dedicated redis client use karna mandatory hota hai
+  // shared redis client yahan crash kar deta hai
+  connection: bullmqRedis,
 });
 
 // helper function job add karne ke liye
