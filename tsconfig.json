@@ -6,7 +6,14 @@
     "outDir": "./dist",
     "strict": true,
     "esModuleInterop": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+
+    // node_modules/@types ko explicitly include kar rahe hain
+    // taaki express, morgan jaise libraries ke types resolve ho sakein
+    "typeRoots": ["./node_modules/@types"],
+
+    // default express Request types ke saath custom typings merge ho sakein
+    "types": ["node"]
   },
-  "include": ["src"]
+  "include": ["src", "src/**/*.d.ts"]
 }
