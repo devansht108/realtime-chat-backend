@@ -3,7 +3,8 @@ import * as jwt from "jsonwebtoken";
 
 // custom request type jisme auth object store kar sakte hain
 // isse hum decoded token ka userId request object me rakh sakte hain
-export interface AuthRequest extends Request {
+// Request ke generics explicitly add kiye gaye hain taaki params, query, body types na tootey
+export interface AuthRequest extends Request<any, any, any, any> {
   auth?: {
     userId: string;
   };
