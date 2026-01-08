@@ -29,24 +29,24 @@ app.use(express.json());
 app.use(cors());
 
 // security related HTTP headers add karta hai
-// jaise XSS protection, clickjacking prevention, etc.
+// jaise XSS protection , clickjacking prevention, etc.
 app.use(helmet());
 
 // har incoming request ka log console me print karta hai
-// method, URL, status code, response time, etc.
+// method, URL, status code,  response time , etc.
 app.use(morgan("dev"));
 
 /*
   AUTH ROUTES
-  - login, register jaise sensitive routes
-  - custom Redis based rate limiter apply kiya gaya hai
-  - brute force aur abuse se protection ke liye
+  login, register jaise sensitive routes
+  custom Redis based rate limiter apply kiya gaya hai
+  brute force aur abuse se protection ke liye
 */
 app.use("/api/auth", customRedisRateLimiter, authRoutes);
 // conversations aur messages related routes
 app.use("/api/conversations", conversationRoutes);
 // user related routes
-// jaise profile, last seen, user status, etc.
+// jaise profile , last seen, user status, etc.
 app.use("/api/users", userRoutes);
 app.use("/api/users", userStatusRoutes);
 app.use("/api/email", emailRoutes);
