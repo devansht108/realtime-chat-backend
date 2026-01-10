@@ -3,6 +3,13 @@
 A production-grade, scalable real-time chat backend built with Node.js, TypeScript, Express, Socket.IO, MongoDB, Redis, and BullMQ.  
 Designed to handle high concurrency, horizontal scaling, and real-world backend workloads.
 
+## 🎥 Demo Video
+
+5-minute Loom walkthrough explaining the system architecture, real-time messaging flow, Redis usage, and production deployment:  
+https://www.loom.com/share/3132024899214395942281b83a229bee
+
+
+
 ---
 
 ## Project Overview
@@ -232,6 +239,7 @@ The backend is deployed on Render using:
 
 - MongoDB Atlas as the primary database
 - Upstash Redis for Pub/Sub, rate limiting, and queues
+
   The server listens on process.env.PORT, which is automatically assigned by Render.
 
 ---
