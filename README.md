@@ -23,6 +23,18 @@ The backend exposes REST APIs for core operations and uses Socket.IO for real-ti
 
 ---
 
+## Project in Action
+
+The following screenshots demonstrate the backend working end-to-end in a production environment.
+
+![User registration via REST API (MongoDB write verified)](screenshots/auth-register.png)
+
+![JWT access token issued on successful login](screenshots/auth-token.png)
+
+![Real-time message delivery using Socket.IO (Redis Pub/Sub)](screenshots/messageDelivery.png)
+
+---
+
 ## Tech Stack
 
 ### Core
@@ -111,6 +123,18 @@ The backend exposes REST APIs for core operations and uses Socket.IO for real-ti
 
 ---
 
+## API Testing & Data Persistence
+
+The screenshots below verify that API requests result in correct database writes and enforcement of system constraints.
+
+![Message persisted in MongoDB after delivery](screenshots/mongodb-message-created.png)
+
+![MongoDB Atlas cluster storing chat data](screenshots/mongodb-atlas.png)
+
+![Redis-based rate limiting enforced (HTTP 429)](screenshots/rate-limiting.png)
+
+---
+
 ## Folder Structure
 
 ```plaintext
@@ -165,6 +189,13 @@ The following diagram illustrates the high-level architecture of the real-time c
 
 ---
 
+## Infrastructure & Deployment Proof
+
+![Backend deployed on Render](screenshots/render-live.png)
+
+**Render Web Service (production environment)**  
+The backend is deployed as a Render Web Service using production environment variables, with MongoDB Atlas and Upstash Redis.
+
 ## Environment Variables
 
 ```env
@@ -181,11 +212,14 @@ NODE_ENV=production
 ## Running Locally
 
 ### Without Docker
+
 ```
 npm install
 npm run dev
 ```
+
 ### With Docker
+
 ```
 docker-compose up --build
 ```
@@ -195,11 +229,15 @@ docker-compose up --build
 ## Deployment
 
 The backend is deployed on Render using:
+
 - MongoDB Atlas as the primary database
 - Upstash Redis for Pub/Sub, rate limiting, and queues
-The server listens on process.env.PORT, which is automatically assigned by Render.
+  The server listens on process.env.PORT, which is automatically assigned by Render.
+
 ---
+
 ## Status
+
 - Express API: ✅ Live
 - MongoDB Atlas: ✅ Connected
 - Redis: ✅ Connected
