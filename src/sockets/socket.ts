@@ -3,7 +3,7 @@ import * as jwt from "jsonwebtoken";
 import {
   saveMessage,
   markDelivered,
-  markRead
+  markRead,
 } from "../services/messageService";
 import { redis } from "../config/redis";
 import { addEmailJob } from "../queues/emailQueue";
@@ -23,7 +23,6 @@ const verifyToken = (token: string): string => {
 };
 
 export const setupSocket = (io: Server) => {
-  // socket connection se pehle auth check karne ka middleware
   io.use((socket, next) => {
     try {
       const token = socket.handshake.auth?.token;
@@ -31,7 +30,6 @@ export const setupSocket = (io: Server) => {
 
       const userId = verifyToken(token);
       socket.data.userId = userId;
-
       next();
     } catch {
       next(new Error("Auth failed"));
@@ -41,116 +39,128 @@ export const setupSocket = (io: Server) => {
   io.on("connection", async (socket: Socket) => {
     const userId = socket.data.userId as string;
 
-    // agar user pehle se map me nahi hai to naya set banao
+    // user room join (SAFE, does not affect anything else)
+    socket.join(userId);
+
     if (!userSocketMap.has(userId)) {
       userSocketMap.set(userId, new Set());
     }
-    // user ka naya socket id add kar do
     userSocketMap.get(userId)!.add(socket.id);
 
     console.log("User connected", userId, socket.id);
 
-    // redis me user ko online mark kar do
     await redis.set(`user:${userId}:online`, "1");
-
-    // baaki sabko bata do ki ye user online aa gaya hai
     socket.broadcast.emit("user_online", { userId });
 
-    // message send karne ka event
     socket.on(
       "send_message",
-      async ({ receiverId, content }: { receiverId: string; content: string }) => {
+      async ({
+        receiverId,
+        content,
+        clientId,
+      }: {
+        receiverId: string;
+        content: string;
+        clientId?: string;
+      }) => {
         console.log("Received send_message event");
 
         try {
-          // message aur conversation database me save kar rahe hain
           const { message, conversation } = await saveMessage(
             userId,
             receiverId,
-            content
+            content,
           );
 
-          console.log("Message saved to DB");
-
-          // naya message aate hi purani cache delete karni padegi
           const cacheKey = `conversation:${conversation._id}:messages`;
           await redis.del(cacheKey);
-          console.log(`Cache invalidated for conversation: ${conversation._id}`);
 
           const receiverSockets = userSocketMap.get(receiverId);
           const senderSockets = userSocketMap.get(userId);
 
-          // receiver ko message bhejo (agar wo online hai)
+          const cleanMessage = {
+            ...message.toObject(),
+            _id: message._id.toString(),
+            sender: message.sender.toString(),
+            receiver: message.receiver.toString(),
+            conversationId: message.conversationId.toString(),
+            clientId,
+          };
+
           if (receiverSockets && receiverSockets.size > 0) {
             for (const socketId of receiverSockets) {
-              io.to(socketId).emit("receive_message", message);
+              io.to(socketId).emit("receive_message", cleanMessage);
               io.to(socketId).emit("conversation_updated", {
-                conversationId: conversation._id,
-                lastMessage: message,
-                unreadCount: conversation.unreadCount.get(receiverId) || 0
+                conversationId: conversation._id.toString(),
+                lastMessage: cleanMessage,
+                unreadCount: conversation.unreadCount.get(receiverId) || 0,
               });
             }
           } else {
-            // USER OFFLINE HAI: Queue me job add karo
-            console.log(`User ${receiverId} is offline. Adding email job to queue.`);
             await addEmailJob({
               receiverId,
               senderId: userId,
-              messageContent: content
+              messageContent: content,
             });
           }
 
-          // sender ko bhi conversation update bhejna zaroori hai
-          if (senderSockets) {
+          if (senderSockets && senderSockets.size > 0) {
             for (const socketId of senderSockets) {
+              io.to(socketId).emit("receive_message", cleanMessage);
               io.to(socketId).emit("conversation_updated", {
-                conversationId: conversation._id,
-                lastMessage: message,
-                unreadCount: 0
+                conversationId: conversation._id.toString(),
+                lastMessage: cleanMessage,
+                unreadCount: 0,
               });
             }
           }
 
-          // sender ko confirm karo ki message server tak pahunch gaya
           socket.emit("message_delivered", {
-            messageId: message._id
+            messageId: cleanMessage._id,
           });
 
-          // database me status delivered update kar do
           await markDelivered(
-            message._id.toString(),
+            cleanMessage._id,
             conversation._id.toString(),
-            receiverId
+            receiverId,
           );
         } catch (error) {
           console.error("Error in send_message:", error);
         }
-      }
+      },
     );
 
     // message read karne ka event
-    socket.on(
-      "message_read",
-      async ({ messageId }: { messageId: string }) => {
+    socket.on("message_read", async ({ messageId }: { messageId: string }) => {
+      try {
         const result = await markRead(messageId, userId);
         if (!result) return;
 
-        const { senderId, readerId } = result;
+        const senderId = String(result.senderId);
+        const readerId = String(result.readerId);
 
         const senderSockets = userSocketMap.get(senderId);
-        if (!senderSockets) return;
 
-        // sender ko batao ki message padh liya gaya hai
-        for (const socketId of senderSockets) {
-          io.to(socketId).emit("message_read", {
-            messageId,
-            readerId
-          });
+        // direct socket emit
+        if (senderSockets && senderSockets.size > 0) {
+          for (const socketId of senderSockets) {
+            io.to(socketId).emit("message_read", {
+              messageId: String(messageId),
+              readerId,
+            });
+          }
         }
-      }
-    );
 
-    // typing start
+        // fallback emit via room (guaranteed delivery)
+        io.to(senderId).emit("message_read", {
+          messageId: String(messageId),
+          readerId,
+        });
+      } catch (err) {
+        console.error("READ RECEIPT ERROR:", err);
+      }
+    });
+
     socket.on("typing", ({ receiverId }) => {
       const receiverSockets = userSocketMap.get(receiverId);
       if (!receiverSockets) return;
@@ -160,7 +170,6 @@ export const setupSocket = (io: Server) => {
       }
     });
 
-    // typing stop
     socket.on("stop_typing", ({ receiverId }) => {
       const receiverSockets = userSocketMap.get(receiverId);
       if (!receiverSockets) return;
@@ -170,7 +179,6 @@ export const setupSocket = (io: Server) => {
       }
     });
 
-    // disconnect
     socket.on("disconnect", async () => {
       const set = userSocketMap.get(userId);
 
