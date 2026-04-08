@@ -3,11 +3,11 @@ import { bullmqRedis } from "../config/redis";
 import { getIO } from "../config/io";
 import Message from "../models/Message";
 
-// Gemini API response ka structure
-interface GeminiResponse {
-  candidates: {
-    content: {
-      parts: { text: string }[];
+// Groq API response ka structure
+interface GroqResponse {
+  choices: {
+    message: {
+      content: string;
     };
   }[];
 }
@@ -33,14 +33,23 @@ const buildTranscript = (
     .join("\n");
 };
 
-// Gemini API call karna
-const callGemini = async (transcript: string): Promise<AnalysisResult> => {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error("GEMINI_API_KEY missing in environment variables");
-  }
+// Groq API call karna
+const callGroq = async (transcript: string): Promise<AnalysisResult> => {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) throw new Error("GROQ_API_KEY missing");
 
-  const prompt = `You are a conversation quality analyzer, similar to how a sales coach analyzes sales calls.
+  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${apiKey}`
+    },
+    body: JSON.stringify({
+      model: "llama-3.1-8b-instant",
+      messages: [
+        {
+          role: "user",
+          content: `You are a conversation quality analyzer, similar to how a sales coach analyzes sales calls.
 
 Analyze this chat conversation and return ONLY a JSON object with no markdown, no explanation:
 {
@@ -50,32 +59,22 @@ Analyze this chat conversation and return ONLY a JSON object with no markdown, n
 }
 
 Conversation:
-${transcript}`;
-
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-      }),
-    }
-  );
+${transcript}`
+        }
+      ],
+      temperature: 0.7
+    })
+  });
 
   if (!response.ok) {
     const errText = await response.text();
-    throw new Error(`Gemini API error ${response.status}: ${errText}`);
+    throw new Error(`Groq API error ${response.status}: ${errText}`);
   }
 
-  const data = (await response.json()) as GeminiResponse;
-  const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-
-  // markdown fences strip karo agar Gemini ne wrap kiya ho
+  const data = await response.json() as GroqResponse;
+  const rawText = data.choices?.[0]?.message?.content ?? "";
   const cleaned = rawText.replace(/```json|```/g, "").trim();
-
-  const parsed: AnalysisResult = JSON.parse(cleaned);
-  return parsed;
+  return JSON.parse(cleaned) as AnalysisResult;
 };
 
 // worker definition — emailWorker ke same pattern ko follow karta hai
@@ -110,8 +109,8 @@ export const analysisWorker = new Worker(
       }))
     );
 
-    // Step 3: Gemini API call karo
-    const analysis = await callGemini(transcript);
+    // Step 3: Groq API call karo
+    const analysis = await callGroq(transcript);
 
     console.log(
       `[AnalysisWorker] Analysis complete for job ${job.id}:`,
