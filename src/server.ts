@@ -4,6 +4,7 @@ import connectDB from "./config/db";
 import { Server } from "socket.io";
 import { setupSocket } from "./sockets/socket";
 import "./workers/emailWorker";
+import "./workers/analysisWorker";
 
 // Redis adapter related imports
 // yeh socket.io ko Redis ke through scale karne ke liye use hota hai
@@ -12,6 +13,8 @@ import {
   redisPublisher,
   redisSubscriber
 } from "./config/redis";
+
+import { setIO } from "./config/io";
 
 // server ka port env se le rahe hain, warna default 8000
 const PORT = process.env.PORT ? Number(process.env.PORT) : 8000;
@@ -32,6 +35,8 @@ async function startServer() {
   // yeh ioredis publisher aur subscriber use karta hai
   io.adapter(createAdapter(redisPublisher, redisSubscriber));
   console.log("Redis adapter is enabled");
+
+   setIO(io); // io singleton set karo before setupSocket
 
   // socket events aur authentication setup kar rahe hain
   setupSocket(io);

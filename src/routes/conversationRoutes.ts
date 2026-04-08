@@ -1,5 +1,5 @@
 import express from "express";
-import type { RequestHandler } from "express";
+import type { RequestHandler, Request, Response } from "express";
 
 // pehle ke controllers
 import {
@@ -11,6 +11,8 @@ import {
 import { getConversationList } from "../controllers/conversationListController";
 
 import { protect } from "../middleware/authMiddleware";
+import { addAnalysisJob } from "../queues/analysisQueue";
+import Conversation from "../models/Conversation";
 
 const router = express.Router();
 
@@ -40,6 +42,42 @@ router.get(
   "/list",
   protect as unknown as RequestHandler,
   getConversationList as unknown as RequestHandler
+);
+
+/*
+  LLM Analysis: conversation ka async AI analysis trigger karne ka route
+  Result Socket.IO event "conversation_analysis" ke through aayega
+*/
+router.post(
+  "/:id/analyze",
+  protect as unknown as RequestHandler,
+  (async (req: Request, res: Response) => {
+    const { id: conversationId } = req.params;
+    const requestedByUserId = (req as any).user?.userId as string;
+
+    // conversation exist karta hai aur user participant hai — verify karo
+    const conversation = await Conversation.findOne({
+      _id: conversationId,
+      participants: requestedByUserId,
+    });
+
+    if (!conversation) {
+      return res.status(404).json({
+        success: false,
+        message: "Conversation not found or access denied",
+      });
+    }
+
+    // BullMQ queue me job daalo — response wait nahi karta
+    await addAnalysisJob({ conversationId, requestedByUserId });
+
+    // Immediately return — result Socket.IO se aayega
+    return res.status(202).json({
+      success: true,
+      message: "Analysis queued. Listen for 'conversation_analysis' socket event.",
+      conversationId,
+    });
+  }) as unknown as RequestHandler
 );
 
 export default router;
