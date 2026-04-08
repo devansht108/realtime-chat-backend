@@ -92,10 +92,13 @@ export const analysisWorker = new Worker(
 
     // Step 1: MongoDB se conversation ke messages fetch karo
     const messages = await Message.find({ conversationId })
-      .sort({ createdAt: 1 })
+      .sort({ createdAt: -1 }) // latest pehle
+      .limit(20) // sirf last 20 messages
       .select("sender content createdAt")
       .lean();
 
+      messages.reverse(); // chronological order restore karo
+      
     if (!messages || messages.length === 0) {
       throw new Error(`No messages found for conversation ${conversationId}`);
     }
