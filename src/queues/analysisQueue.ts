@@ -13,11 +13,7 @@ export const addAnalysisJob = async (data: {
 }) => {
   await analysisQueue.add("analyze-conversation", data, {
     removeOnComplete: true,
-    removeOnFail: false, // fail hone par record rakhna for debugging
-    attempts: 3, // Gemini API timeout ke case me retry
-    backoff: {
-      type: "exponential",
-      delay: 2000,
-    },
+    removeOnFail: false,
+    attempts: 1, // no retries — quota errors loop prevent karne ke liye
   });
 };
