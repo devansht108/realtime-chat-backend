@@ -9,14 +9,18 @@
 
     <div>
       <label>Access Token:</label>
-      <input id="tokenInput" type="text" style="width: 600px" />
+      <input id="tokenInput" type="text" style="width: 600px"
+        value="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2OWQ2MTMxNWY4NWQxNzZhYzdjMDE0MjMiLCJpYXQiOjE3NzU2NDEyMzUsImV4cCI6MTc3NTY0MjEzNX0.lSRml3R6KPPG8mJjmiOFA3rY1bu3hlMYKNycW2ViA6w" />
       <button onclick="connectSocket()">Connect</button>
     </div>
 
+    <br/>
+    <button onclick="sendMessage()" style="padding:10px 20px; font-size:16px;">Send Message to User2</button>
+    <br/><br/>
     <p id="status">Not connected</p>
+    <pre id="analysis" style="background:#111; color:#0f0; padding:16px; min-height:100px;">Waiting for conversation_analysis event...</pre>
 
-
-    <script src="http://localhost:8000/socket.io/socket.io.js"></script>
+    <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
 
     <script>
       let socket;
@@ -29,31 +33,50 @@
           return;
         }
 
-        socket = io("http://localhost:8000", {
-          auth: {
-            token: token,
-          },
+        socket = io("https://realtime-chat-backend-mdos.onrender.com", {
+          auth: { token }
         });
 
         window.socket = socket;
 
         socket.on("connect", () => {
-          document.getElementById("status").innerText =
-            "Connected with id: " + socket.id;
+          document.getElementById("status").innerText = "Connected! Socket ID: " + socket.id;
           console.log("socket connected", socket.id);
         });
 
         socket.on("connect_error", (err) => {
+          document.getElementById("status").innerText = "Connection error: " + err.message;
           console.error("connect_error", err.message);
         });
 
         socket.on("receive_message", (msg) => {
           console.log("receive_message", msg);
+          document.getElementById("status").innerText = 
+            "Message sent! conversationId: " + msg.conversationId;
         });
 
         socket.on("message_delivered", (data) => {
           console.log("message_delivered", data);
         });
+
+        // THIS IS THE KEY EVENT — analysis result aayega yahan
+        socket.on("conversation_analysis", (data) => {
+          console.log("ANALYSIS RECEIVED:", data);
+          document.getElementById("analysis").innerText = JSON.stringify(data, null, 2);
+        });
+      }
+
+      function sendMessage() {
+        if (!socket || !socket.connected) {
+          alert("Pehle Connect karo");
+          return;
+        }
+        socket.emit("send_message", {
+          receiverId: "69d6148ef85d176ac7c01428",
+          content: "Hey! How are you doing? I wanted to discuss the project updates.",
+          clientId: "test-" + Date.now()
+        });
+        console.log("Message sent");
       }
     </script>
   </body>

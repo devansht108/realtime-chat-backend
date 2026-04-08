@@ -53,8 +53,8 @@ router.post(
   protect as unknown as RequestHandler,
   (async (req: Request, res: Response) => {
     const { id: conversationId } = req.params;
-    const requestedByUserId = (req as any).user?.userId as string;
-
+    const requestedByUserId = (req as any).auth?.userId as string;
+    
     // conversation exist karta hai aur user participant hai — verify karo
     const conversation = await Conversation.findOne({
       _id: conversationId,
